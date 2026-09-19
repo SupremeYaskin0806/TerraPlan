@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TerraPlan — Smart Agriculture Intelligence Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+    <header class="navbar">
+        <div class="nav-container">
+            <a href="#" class="brand-logo">
+                <span class="brand-icon">🌱</span>
+                <span class="brand-text">TerraPlan</span>
+            </a>
+            <nav class="nav-links">
+                <a href="#planner">Crop Planner</a>
+                <a href="#recommendations">Crop Matcher</a>
+                <a href="#dashboard">Farm Dashboard</a>
+                <a href="#knowledge">Knowledge Hub</a>
+            </nav>
+            <button class="btn btn-primary" id="open-advisor-btn">💬 Ask Agri-Advisor</button>
+        </div>
+    </header>
+
+    <section class="hero-section">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <span class="badge-pill">AI-Powered Agricultural Operating System</span>
+            <h1 class="hero-title">Plan Smarter. Grow Better.</h1>
+            <p class="hero-subtitle">Transform your land size, soil conditions, live weather forecasts, and market trends into a precision crop-growing strategy.</p>
+            <div class="hero-cta-group">
+                <a href="#planner" class="btn btn-primary btn-lg">Start Farm Strategy</a>
+                <button class="btn btn-secondary btn-lg" id="hero-quick-match-btn">Find What To Grow</button>
+            </div>
+        </div>
+    </section>
+
+    <main class="main-wrapper">
+
+        <section class="planner-section" id="planner">
+            <div class="section-header">
+                <h2>Interactive Farm Strategy Builder</h2>
+                <p>Complete the 5 steps below to generate an AI agronomic blueprint.</p>
+            </div>
+
+            <div class="stepper-card">
+                <form id="farm-planner-form">
+                    <div class="form-grid">
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <span class="step-num">1</span> What crop are you planning to grow?
+                            </label>
+                            <input type="text" id="input-crop" class="form-control" placeholder="e.g. Tomato, Cotton, Rice, Chilli, Maize" required>
+                            <div class="tag-chips">
+                                <span class="chip" onclick="selectCrop('Tomato')">Tomato</span>
+                                <span class="chip" onclick="selectCrop('Cotton')">Cotton</span>
+                                <span class="chip" onclick="selectCrop('Rice')">Rice</span>
+                                <span class="chip" onclick="selectCrop('Chilli')">Chilli</span>
+                                <span class="chip" onclick="selectCrop('Groundnut')">Groundnut</span>
+                                <span class="chip" onclick="selectCrop('Maize')">Maize</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                <span class="step-num">2</span> Where is your farm located?
+                            </label>
+                            <div class="input-with-action">
+                                <input type="text" id="input-location" class="form-control" placeholder="Village, District, or State" required>
+                                <button type="button" class="btn-input-addon" id="btn-detect-gps" title="Use GPS Location">📍 Auto-Detect</button>
+                            </div>
+                            <small class="form-caption" id="location-geo-status">Provides local weather & climate context</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                <span class="step-num">3</span> Select Farm Soil Type
+                            </label>
+                            <select id="input-soil-type" class="form-select" required>
+                                <option value="Auto-Detect (Determine based on location)" selected>✨ Auto-Detect (Based on Location)</option>
+                                <option value="Black Cotton Soil / Regur">Black Cotton Soil / Regur (Deccan Plateau)</option>
+                                <option value="Red & Yellow Sandy Loam">Red & Yellow Sandy Loam</option>
+                                <option value="Alluvial / Delta Soil">Alluvial Soil (River Plains & Deltas)</option>
+                                <option value="Clay Loam / Heavy Wetland Soil">Clay Loam / Heavy Wetland (Paddy Field)</option>
+                                <option value="Laterite Soil">Laterite Soil (High Rainfall & Coastal)</option>
+                                <option value="Arid / Desert Sandy Soil">Arid / Desert Sandy Soil</option>
+                                <option value="Saline / Alkaline Soil">Saline / Alkaline Soil</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                <span class="step-num">4</span> How much land do you have?
+                            </label>
+                            <div class="input-group-split">
+                                <input type="number" step="0.1" id="input-land-size" class="form-control" placeholder="5" required>
+                                <select id="input-land-unit" class="form-select">
+                                    <option value="Acres" selected>Acres</option>
+                                    <option value="Hectares">Hectares</option>
+                                    <option value="Cents">Cents</option>
+                                    <option value="Guntas">Guntas</option>
+                                    <option value="Square Meters">Sq. Meters</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                <span class="step-num">5</span> Current selling/mandi price (Optional)
+                            </label>
+                            <input type="text" id="input-market-price" class="form-control" placeholder="e.g. ₹25/kg, ₹4,500/quintal">
+                            <div class="checkbox-wrapper">
+                                <input type="checkbox" id="check-unknown-price">
+                                <label for="check-unknown-price">I don't know current price (Fetch latest data)</label>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="planner-footer">
+                        <button type="submit" class="btn btn-primary btn-xl" id="btn-generate-plan">
+                            ⚡ Generate Comprehensive Farm Plan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="results-section" id="results-display" style="display: none;">
+            
+            <div class="results-banner">
+                <div>
+                    <h2 id="out-crop-title">Farm Blueprint: Tomato</h2>
+                    <p id="out-crop-subtitle">5.0 Acres • Guntur District • Summer / Kharif Season</p>
+                </div>
+                <div class="banner-status-pill" id="out-planting-status">Optimal Planting Window Active</div>
+            </div>
+
+            <div class="dashboard-grid">
+                
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <span class="card-icon">🌦️</span>
+                        <h3>Weather Impact & Directives</h3>
+                    </div>
+                    <div class="dash-card-body">
+                        <div class="weather-brief" id="out-weather-brief">
+                            <span class="temp-badge" id="out-temp">28°C</span>
+                            <span class="cond-text" id="out-cond">Scattered Clouds</span>
+                        </div>
+                        <p class="impact-text" id="out-weather-impact">Moderate soil moisture levels. Heavy precipitation not expected within 72 hours.</p>
+                        <div class="highlight-box" id="out-irrigation-directive">
+                            <strong>💧 Irrigation Rule:</strong> Apply standard 4-day cycle.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <span class="card-icon">📈</span>
+                        <h3>Market & Pricing Intelligence</h3>
+                    </div>
+                    <div class="dash-card-body">
+                        <div class="market-stat-row">
+                            <div>
+                                <span class="stat-label">Market Trend</span>
+                                <span class="trend-badge trend-up" id="out-market-trend">📈 Rising</span>
+                            </div>
+                            <div>
+                                <span class="stat-label">Est. Range</span>
+                                <span class="price-val" id="out-market-price">₹28 - ₹34 / kg</span>
+                            </div>
+                        </div>
+                        <p class="market-summary" id="out-market-reason">High festive demand expected during scheduled harvest period.</p>
+                    </div>
+                </div>
+
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <span class="card-icon">💰</span>
+                        <h3>Estimated Financial Economics</h3>
+                    </div>
+                    <div class="dash-card-body">
+                        <div class="economics-list">
+                            <div class="econ-item"><span>Est. Investment:</span> <strong id="out-inv">₹1,20,000</strong></div>
+                            <div class="econ-item"><span>Expected Yield:</span> <strong id="out-yield">14-18 Tons</strong></div>
+                            <div class="econ-item"><span>Expected Revenue:</span> <strong id="out-rev">₹3,40,000</strong></div>
+                            <div class="econ-item highlight-profit"><span>Est. Net Profit:</span> <strong id="out-profit">₹2,20,000</strong></div>
+                        </div>
+                        <small class="disclaimer-text">*Estimations only. Non-guaranteed subject to market volatility.</small>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="dual-panel-grid">
+                
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <span class="card-icon">🗺️</span>
+                        <h3>Smart Cultivation & Water Zones</h3>
+                    </div>
+                    <div class="dash-card-body chart-flex-container">
+                        <div class="chart-wrapper">
+                            <canvas id="landDivisionChart"></canvas>
+                        </div>
+                        <div class="land-details-list" id="out-land-details" style="max-height: 380px; overflow-y: auto; padding-right: 10px;">
+                            </div>
+                    </div>
+                </div>
+
+                <div class="dash-card">
+                    <div class="dash-card-header">
+                        <span class="card-icon">⏱️</span>
+                        <h3>Crop Lifecycle & Milestones</h3>
+                    </div>
+                    <div class="dash-card-body">
+                        <div class="timeline-container" id="out-timeline-stages">
+                            </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="dash-card full-width-card">
+                <div class="dash-card-header">
+                    <span class="card-icon">🌱</span>
+                    <h3>Technical Agronomic Execution Guide</h3>
+                </div>
+                <div class="dash-card-body agronomy-grid">
+                    <div class="agro-block">
+                        <h4>🚜 Land Preparation & Spacing</h4>
+                        <p id="out-landprep">Deep plowing followed by rotavator leveling.</p>
+                        <p><strong>Spacing:</strong> <span id="out-spacing">60cm x 45cm</span></p>
+                    </div>
+                    <div class="agro-block">
+                        <h4>🧪 Fertilizer & Nutrition</h4>
+                        <ul id="out-fertilizers" class="styled-bullet-list"></ul>
+                    </div>
+                    <div class="agro-block">
+                        <h4>🐛 Pest & Disease Protection</h4>
+                        <ul id="out-pests" class="styled-bullet-list"></ul>
+                    </div>
+                    <div class="agro-block">
+                        <h4>✅ Immediate Next Actions (Today)</h4>
+                        <ul id="out-actions" class="action-check-list"></ul>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+        <section class="matcher-section" id="recommendations">
+            <div class="matcher-card">
+                <div class="matcher-text">
+                    <h2>Unsure what crop to grow on your land?</h2>
+                    <p>Let TerraPlan evaluate your soil type, water source, and current market season to recommend the top 3 high-yield crops.</p>
+                </div>
+                <div class="matcher-controls">
+                    <div class="matcher-field">
+                        <label for="rec-soil">Soil Classification</label>
+                        <select id="rec-soil" class="form-select select-wide">
+                            <option value="Alluvial Soil (River Plains & Deltas)">Alluvial Soil (Indo-Gangetic Plains & Coastal Deltas)</option>
+                            <option value="Black Cotton Soil / Regur (Deccan Traps)" selected>Black Cotton Soil / Regur (Deccan Plateau)</option>
+                            <option value="Red & Yellow Sandy Loam">Red & Yellow Sandy Loam (Southern & Eastern India)</option>
+                            <option value="Laterite Soil (High Rainfall & Hills)">Laterite Soil (Western Ghats & Coastal Belts)</option>
+                            <option value="Coastal Sandy Alluvial">Coastal Sandy Alluvial (East & West Coastline)</option>
+                            <option value="Arid / Desert Sandy Soil">Arid / Desert Sandy Soil (Northwestern Plains)</option>
+                            <option value="Mountain & Forest Humus Soil">Mountain & Forest Humus Soil (Hilly Terrains)</option>
+                            <option value="Clay Loam / Heavy Wetland Soil">Clay Loam / Heavy Wetland Soil (Paddy Fields)</option>
+                            <option value="Saline / Alkaline Soil">Saline / Alkaline Soil (Canal & Coastal Basins)</option>
+                            <option value="Peaty & Marshy Soil">Peaty & Marshy Soil (High Organic Lowlands)</option>
+                        </select>
+                    </div>
+
+                    <div class="matcher-field">
+                        <label for="rec-water">Irrigation Infrastructure</label>
+                        <select id="rec-water" class="form-select select-wide">
+                            <option value="Borewell + Drip / Micro-Irrigation">Borewell + Drip / Micro-Irrigation</option>
+                            <option value="Canal / River Surface Gravity Flow">Canal / River Flow Irrigation</option>
+                            <option value="Open Well + Sprinkler Irrigation">Open Well + Sprinkler System</option>
+                            <option value="Farm Pond / Tank Storage">Farm Pond / Rainwater Tank Storage</option>
+                            <option value="Rainfed (Monsoon Dependent)">Rainfed (100% Monsoon Dependent)</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-primary btn-match" id="btn-run-matcher">Run Crop Matcher</button>
+                </div>
+            </div>
+            <div id="matcher-results" class="matcher-results-grid" style="display: none;"></div>
+        </section>
+
+        <section class="knowledge-section" id="knowledge">
+            <div class="section-header">
+                <h2>Agricultural Knowledge Center</h2>
+                <p>Essential agronomy principles and smart farming techniques.</p>
+            </div>
+            <div class="accordion-container">
+                <div class="accordion-item">
+                    <button class="accordion-header">💧 Drip Irrigation vs. Flood Irrigation Efficiency <span>+</span></button>
+                    <div class="accordion-body">
+                        <p>Drip irrigation delivers water and nutrients directly to plant root zones, saving 40-60% of water compared to traditional flood irrigation while mitigating fungal diseases caused by standing water.</p>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <button class="accordion-header">🧪 Balancing N-P-K & Micronutrients <span>+</span></button>
+                    <div class="accordion-body">
+                        <p>Nitrogen (N) supports vegetative and leaf canopy growth, Phosphorus (P) accelerates root development and early flowering, and Potassium (K) enhances drought resistance, disease tolerance, and fruit size.</p>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <button class="accordion-header">🌾 Crop Rotation Benefits <span>+</span></button>
+                    <div class="accordion-body">
+                        <p>Alternating heavy nitrogen consumers (like Maize or Cotton) with legumes (like Groundnut or Pulses) replenishes natural soil nitrogen through root-nodule rhizobia and breaks recurring insect life cycles.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <aside class="chat-drawer" id="advisor-drawer">
+        <div class="drawer-header">
+            <div class="drawer-title">
+                <span>🌱</span>
+                <h3>TerraPlan Advisor</h3>
+            </div>
+            <button class="btn-close-drawer" id="close-drawer-btn">&times;</button>
+        </div>
+        <div class="drawer-body" id="chat-history-box">
+            <div class="chat-msg ai-msg">
+                Welcome to TerraPlan 🌱<br><br>
+                I am your digital agricultural consultant. Ask me any agronomic question regarding crop suitability, pest symptoms, fertilizer schedules, or market timing!
+            </div>
+        </div>
+        <div class="drawer-footer">
+            <form id="chat-drawer-form">
+                <input type="text" id="chat-user-input" placeholder="Ask about fertilizers, pests, rain..." autocomplete="off">
+                <button type="submit" class="btn btn-primary">Send</button>
+            </form>
+        </div>
+    </aside>
+
+    <footer class="site-footer">
+        <p>© 2026 TerraPlan Agricultural Intelligence Platform. Designed for modern landowners, students, and agronomists.</p>
+    </footer>
+
+    <script src="/static/js/script.js"></script>
+</body>
+</html>
