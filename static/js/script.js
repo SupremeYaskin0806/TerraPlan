@@ -95,6 +95,21 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================================
     // 3. GENERATE FARM STRATEGY EXECUTION
     // ==========================================
+    
+    // LCD Update Function
+    const sendToLCD = async (headingText) => {
+        try {
+            await fetch("http://10.240.68.29/update", { // Update this IP if the ESP32 changes it
+                method: "POST",
+                body: headingText,
+                headers: { "Content-Type": "text/plain" }
+            });
+            console.log("Sent to LCD successfully");
+        } catch (error) {
+            console.error("Failed to send data to LCD", error);
+        }
+    };
+
     const plannerForm = document.getElementById('farm-planner-form');
     const genButton = document.getElementById('btn-generate-plan');
     const resultsContainer = document.getElementById('results-display');
@@ -128,6 +143,24 @@ document.addEventListener("DOMContentLoaded", () => {
                     renderFarmDashboard(resData.data, resData.weather);
                     resultsContainer.style.display = 'block';
                     resultsContainer.scrollIntoView({ behavior: 'smooth' });
+                    
+                    // --- PREPARE & SEND MULTI-DATA LCD BUNDLE ---
+                    let weatherStr = resData.weather ? `${resData.weather.temp}C ${resData.weather.description}` : "Seasonal Avg";
+                    
+                    // Pull the actual date from the timeline stages
+                    let startDate = resData.data.timeline_stages && resData.data.timeline_stages.length > 0 
+                        ? resData.data.timeline_stages[0].date_range 
+                        : "Optimal Window";
+
+                    let lcdPayload = [
+                        resData.data.crop_overview.crop,
+                        activeFarmContext.location,
+                        weatherStr,
+                        startDate, // Now sends the actual date range
+                        resData.data.economics.estimated_net_profit
+                    ].join("|");
+                    
+                    sendToLCD(lcdPayload);
                 } else {
                     alert("Strategy compilation failed. Please check inputs.");
                 }
@@ -145,7 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================================
     function renderFarmDashboard(data, weather) {
         document.getElementById('out-crop-title').innerText = `Farm Strategy: ${data.crop_overview.crop}`;
-        document.getElementById('out-crop-subtitle').innerText = `${activeFarmContext.land_size} ${activeFarmContext.land_unit} • ${activeFarmContext.location} • ${data.crop_overview.inferred_soil_type} • ${data.crop_overview.season_category} (${data.crop_overview.total_duration_days})`;
+        document.getElementById('out-crop-subtitle').innerText = `${activeFarmContext.land_size} ${activeFarmContext.land_unit}\n${activeFarmContext.location}\n${data.crop_overview.inferred_soil_type}\n${data.crop_overview.season_category} (${data.crop_overview.total_duration_days})`;
         
         // Planting status updated to use the weather rationale
         document.getElementById('out-planting-status').innerText = data.recommended_start.suitability_status || "Recommended Window";
@@ -223,7 +256,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (landChartInstance) landChartInstance.destroy();
 
         // Extract labels and percentages from the new schema
-        const labels = zoneData.map(d => `${d.zone_name} - ${d.recommended_crop}`);
+        const labels = zoneData.map(d => `${d.zone_name}\n${d.recommended_crop}`);
         const percentages = zoneData.map(d => d.percentage);
 
         landChartInstance = new Chart(ctx, {
@@ -359,7 +392,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-
+ 
     // ==========================================
     // 7. KNOWLEDGE ACCORDION
     // ==========================================

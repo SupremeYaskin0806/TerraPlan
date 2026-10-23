@@ -12,9 +12,8 @@ app = Flask(__name__)
 
 # --- API KEYS ---
 WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "90f3a7a974e9d890b99c3f06b9fe3ad2")
-groq_api_key = os.getenv("GROQ_API_KEY")
-
-client = Groq(api_key=GROQ_API_KEY)
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+client = Groq(api_key=groq_api_key)
 
 # ----------------------------------------------------
 # 1. LIVE WEATHER HELPER
