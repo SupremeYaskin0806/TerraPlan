@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 # --- API KEYS ---
 WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "90f3a7a974e9d890b99c3f06b9fe3ad2")
-GROQ_API_KEY = os.environ.get("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")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 client = Groq(api_key=GROQ_API_KEY)
 
 # ----------------------------------------------------
