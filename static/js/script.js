@@ -6,7 +6,11 @@ let activeFarmContext = {
     land_unit: 'Acres',
     market_price: null,
     lat: null,
-    lon: null
+    lon: null,
+    soil_n: 0,
+    soil_p: 0,
+    soil_k: 0,
+    used_soil_fallback: false
 };
 
 let landChartInstance = null; 
@@ -16,14 +20,12 @@ function cleanMarkdown(text) {
     if (!text) return '';
     let html = text.replace(/\r/g, '');
     
-    // Strip accidental pipe table syntax
     html = html.replace(/\|[^\n]+\|/g, (match) => {
         let items = match.split('|').map(s => s.trim()).filter(Boolean);
         return items.length ? '• ' + items.join(' — ') : '';
     });
     html = html.replace(/^[-|: ]+$/gm, '');
 
-    // Standard markdown formatting
     html = html.replace(/^### (.*$)/gm, '<div style="font-weight:700; margin:6px 0 2px;">$1</div>');
     html = html.replace(/^## (.*$)/gm, '<div style="font-weight:700; font-size:1.05rem; margin:8px 0 4px; color:#1b4332;">$1</div>');
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -35,6 +37,8 @@ function cleanMarkdown(text) {
 
 document.addEventListener("DOMContentLoaded", () => {
     
+    const ESP32_IP = "10.240.68.29"; 
+
     // ==========================================
     // 1. CHIP SELECTION & FORM CONTROLS
     // ==========================================
@@ -52,6 +56,25 @@ document.addEventListener("DOMContentLoaded", () => {
             } else {
                 priceInput.value = "";
                 priceInput.disabled = false;
+            }
+        });
+    }
+
+    const unknownSoilCheck = document.getElementById('check-unknown-soil');
+    const soilN = document.getElementById('input-soil-n');
+    const soilP = document.getElementById('input-soil-p');
+    const soilK = document.getElementById('input-soil-k');
+
+    if (unknownSoilCheck && soilN && soilP && soilK) {
+        unknownSoilCheck.addEventListener('change', (e) => {
+            const disabled = e.target.checked;
+            soilN.disabled = disabled;
+            soilP.disabled = disabled;
+            soilK.disabled = disabled;
+            if (disabled) {
+                soilN.value = '';
+                soilP.value = '';
+                soilK.value = '';
             }
         });
     }
@@ -82,7 +105,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Clear lat/lon if the user manually edits the location input (The Stale GPS Fix)
     const locationInput = document.getElementById('input-location');
     if (locationInput) {
         locationInput.addEventListener('input', () => {
@@ -95,11 +117,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // ==========================================
     // 3. GENERATE FARM STRATEGY EXECUTION
     // ==========================================
-    
-    // LCD Update Function
     const sendToLCD = async (headingText) => {
         try {
-            await fetch("http://10.240.68.29/update", { // Update this IP if the ESP32 changes it
+            await fetch(`http://${ESP32_IP}/update`, { 
                 method: "POST",
                 body: headingText,
                 headers: { "Content-Type": "text/plain" }
@@ -124,6 +144,27 @@ document.addEventListener("DOMContentLoaded", () => {
             activeFarmContext.land_size = document.getElementById('input-land-size').value.trim();
             activeFarmContext.land_unit = document.getElementById('input-land-unit').value;
             activeFarmContext.market_price = priceInput.value.trim() || 'Market Average';
+            
+            // Precise Soil Health Card fallback evaluation
+            let inputN = parseFloat(document.getElementById('input-soil-n')?.value);
+            let inputP = parseFloat(document.getElementById('input-soil-p')?.value);
+            let inputK = parseFloat(document.getElementById('input-soil-k')?.value);
+            let unknownSoil = document.getElementById('check-unknown-soil')?.checked || false;
+
+            activeFarmContext.used_soil_fallback = unknownSoil || (isNaN(inputN) && isNaN(inputP) && isNaN(inputK));
+
+            if (activeFarmContext.used_soil_fallback) {
+                const sType = activeFarmContext.soil_type.toLowerCase();
+                if (sType.includes('black')) { activeFarmContext.soil_n = 10; activeFarmContext.soil_p = 8; activeFarmContext.soil_k = 40; } 
+                else if (sType.includes('red') || sType.includes('yellow')) { activeFarmContext.soil_n = 8; activeFarmContext.soil_p = 5; activeFarmContext.soil_k = 15; }
+                else if (sType.includes('alluvial')) { activeFarmContext.soil_n = 15; activeFarmContext.soil_p = 10; activeFarmContext.soil_k = 30; } 
+                else if (sType.includes('laterite')) { activeFarmContext.soil_n = 10; activeFarmContext.soil_p = 5; activeFarmContext.soil_k = 10; }
+                else { activeFarmContext.soil_n = 10; activeFarmContext.soil_p = 10; activeFarmContext.soil_k = 20; }
+            } else {
+                activeFarmContext.soil_n = inputN || 0;
+                activeFarmContext.soil_p = inputP || 0;
+                activeFarmContext.soil_k = inputK || 0;
+            }
 
             genButton.innerText = "⏳ Synthesizing Agronomic Models...";
             genButton.disabled = true;
@@ -144,10 +185,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     resultsContainer.style.display = 'block';
                     resultsContainer.scrollIntoView({ behavior: 'smooth' });
                     
-                    // --- PREPARE & SEND MULTI-DATA LCD BUNDLE ---
                     let weatherStr = resData.weather ? `${resData.weather.temp}C ${resData.weather.description}` : "Seasonal Avg";
                     
-                    // Pull the actual date from the timeline stages
                     let startDate = resData.data.timeline_stages && resData.data.timeline_stages.length > 0 
                         ? resData.data.timeline_stages[0].date_range 
                         : "Optimal Window";
@@ -156,7 +195,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         resData.data.crop_overview.crop,
                         activeFarmContext.location,
                         weatherStr,
-                        startDate, // Now sends the actual date range
+                        startDate, 
                         resData.data.economics.estimated_net_profit
                     ].join("|");
                     
@@ -180,10 +219,8 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('out-crop-title').innerText = `Farm Strategy: ${data.crop_overview.crop}`;
         document.getElementById('out-crop-subtitle').innerText = `${activeFarmContext.land_size} ${activeFarmContext.land_unit}\n${activeFarmContext.location}\n${data.crop_overview.inferred_soil_type}\n${data.crop_overview.season_category} (${data.crop_overview.total_duration_days})`;
         
-        // Planting status updated to use the weather rationale
         document.getElementById('out-planting-status').innerText = data.recommended_start.suitability_status || "Recommended Window";
         
-        // Weather with Fallback Fix
         if (weather) {
             document.getElementById('out-temp').innerText = `${weather.temp}°C`;
             document.getElementById('out-cond').innerText = weather.description;
@@ -192,7 +229,6 @@ document.addEventListener("DOMContentLoaded", () => {
             document.getElementById('out-cond').innerText = "Seasonal Averages Applied";
         }
         
-        // Use weather-based rationale for planting advice
         document.getElementById('out-weather-impact').innerHTML = `<strong>Planting Guide:</strong> ${data.recommended_start.weather_based_rationale}<br><br><strong>Current Impact:</strong> ${data.weather_impact.actionable_advice}`;
         document.getElementById('out-irrigation-directive').innerHTML = `<strong>💧 Weather Adjustment:</strong> ${data.weather_impact.irrigation_adjustment}`;
 
@@ -208,13 +244,108 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('out-profit').innerText = data.economics.estimated_net_profit;
 
         document.getElementById('out-landprep').innerText = data.how_to_grow.land_preparation;
-        document.getElementById('out-spacing').innerText = data.how_to_grow.spacing;
 
+        // --- PRECISE SEED POPULATION CALCULATOR ---
+        let seedAreaSqM = parseFloat(activeFarmContext.land_size);
+        const landUnit = activeFarmContext.land_unit.toLowerCase();
+        if (landUnit.includes('acre')) seedAreaSqM *= 4046.86;
+        else if (landUnit.includes('hectare')) seedAreaSqM *= 10000;
+        else if (landUnit.includes('cent')) seedAreaSqM *= 40.47;
+        else if (landUnit.includes('gunta')) seedAreaSqM *= 101.17;
+
+        let spacingText = data.how_to_grow.spacing.toLowerCase();
+        let plantsRequired = "Calculating...";
+        let seedsToBuy = "Calculating...";
+        
+        try {
+            let numbers = spacingText.match(/\d+(\.\d+)?/g);
+            if (numbers && numbers.length >= 2) {
+                let rowSpace = parseFloat(numbers[0]);
+                let plantSpace = parseFloat(numbers[1]);
+                
+                if (spacingText.includes('cm')) {
+                    rowSpace = rowSpace / 100;
+                    plantSpace = plantSpace / 100;
+                }
+                
+                let areaPerPlant = rowSpace * plantSpace;
+                let exactPlants = Math.floor(seedAreaSqM / areaPerPlant);
+                let totalSeeds = Math.floor(exactPlants * 1.10);
+                
+                plantsRequired = exactPlants.toLocaleString('en-IN');
+                seedsToBuy = totalSeeds.toLocaleString('en-IN');
+                
+                document.getElementById('out-spacing').innerHTML = `${data.how_to_grow.spacing}<br>
+                <span style="color:#1b4332; font-weight:600; display:block; margin-top:8px;">🎯 Target Plant Population: ${plantsRequired} plants</span>
+                <span style="color:#e65100; font-size:0.9em;">🛒 Purchase ${seedsToBuy} seeds (Includes 10% safety buffer)</span>`;
+            } else {
+                document.getElementById('out-spacing').innerText = data.how_to_grow.spacing;
+            }
+        } catch (e) {
+            document.getElementById('out-spacing').innerText = data.how_to_grow.spacing;
+            console.error("Could not parse spacing for seed math", e);
+        }
+
+        // --- PRECISE FERTILIZER CALCULATOR ---
         const fertList = document.getElementById('out-fertilizers');
-        fertList.innerHTML = data.how_to_grow.fertilizer_schedule.map(f => `<li>${f}</li>`).join('');
+        let areaAcres = parseFloat(activeFarmContext.land_size);
+        const fertUnit = activeFarmContext.land_unit.toLowerCase();
+        if (fertUnit.includes('hectare')) areaAcres *= 2.471;
+        else if (fertUnit.includes('cent')) areaAcres *= 0.01;
+        else if (fertUnit.includes('gunta')) areaAcres *= 0.025;
+        else if (fertUnit.includes('meter')) areaAcres *= 0.000247;
 
+        const cropReqs = {
+            'tomato': { n: 60, p: 32, k: 40 },
+            'cotton': { n: 48, p: 24, k: 24 },
+            'rice':   { n: 40, p: 20, k: 20 },
+            'chilli': { n: 60, p: 24, k: 32 },
+            'maize':  { n: 48, p: 24, k: 16 },
+            'default':{ n: 50, p: 25, k: 25 }
+        };
+
+        const cropKey = activeFarmContext.crop.toLowerCase();
+        const req = cropReqs[cropKey] || cropReqs['default'];
+
+        let deficitN = ((req.n - activeFarmContext.soil_n) * areaAcres).toFixed(1);
+        let deficitP = ((req.p - activeFarmContext.soil_p) * areaAcres).toFixed(1);
+        let deficitK = ((req.k - activeFarmContext.soil_k) * areaAcres).toFixed(1);
+
+        if (deficitN < 0) deficitN = 0;
+        if (deficitP < 0) deficitP = 0;
+        if (deficitK < 0) deficitK = 0;
+
+        let fertHTML = `<li style="background: #ffebee; color: #b71c1c; padding: 6px; border-radius: 4px; margin-bottom: 8px;"><strong>⚠️ Strict Application Limits for ${areaAcres.toFixed(1)} Acres:</strong></li>`;
+        
+        if (activeFarmContext.used_soil_fallback) {
+            fertHTML += `<li style="background: #fff3e0; color: #e65100; padding: 6px; border-radius: 4px; margin-bottom: 8px; font-size: 0.9em;"><strong>ℹ️ Notice:</strong> Exact soil test not provided. Fertilizer volumes were estimated using regional baselines for <em>${activeFarmContext.soil_type.split('(')[0].trim()}</em>.</li>`;
+        }
+
+        fertHTML += `<li><strong>Nitrogen (N) Deficit:</strong> Apply exactly ${deficitN} kg</li>`;
+        fertHTML += `<li><strong>Phosphorus (P) Deficit:</strong> Apply exactly ${deficitP} kg</li>`;
+        fertHTML += `<li><strong>Potassium (K) Deficit:</strong> Apply exactly ${deficitK} kg</li>`;
+
+        if (deficitN == 0 && deficitP == 0 && deficitK == 0) {
+            fertHTML += `<li style="color:#2e7d32; font-weight:bold;">✅ Soil nutrients are optimal. DO NOT apply base fertilizers.</li>`;
+        }
+
+        fertList.innerHTML = fertHTML;
+
+        // --- DYNAMIC WEATHER-DRIVEN PEST & DISEASE ALERTS ---
         const pestList = document.getElementById('out-pests');
-        pestList.innerHTML = data.how_to_grow.pest_disease_management.map(p => `<li>${p}</li>`).join('');
+        let tempVal = parseFloat(weather ? weather.temp : 25);
+        let condString = (weather ? weather.description.toLowerCase() : "clear");
+        
+        let dynamicPestAlert = "";
+        if ((condString.includes('rain') || condString.includes('cloud') || condString.includes('storm')) && tempVal >= 20 && tempVal <= 30) {
+            dynamicPestAlert = `<li style="background: #fff3e0; color: #e65100; padding: 6px; border-radius: 4px; margin-bottom: 8px;"><strong>🚨 Weather Trigger:</strong> High humidity and warm temps detected. Extreme risk of Fungal Blight and Mildew. <strong>Action:</strong> Apply preventative fungicide spray.</li>`;
+        } else if (tempVal > 30 && (condString.includes('clear') || condString.includes('sun'))) {
+            dynamicPestAlert = `<li style="background: #fff3e0; color: #e65100; padding: 6px; border-radius: 4px; margin-bottom: 8px;"><strong>🚨 Weather Trigger:</strong> Dry heat detected. High risk of sucking pests (Aphids, Thrips, Whiteflies). <strong>Action:</strong> Monitor undersides of leaves; ready Neem oil or standard insecticide.</li>`;
+        } else {
+            dynamicPestAlert = `<li style="background: #e8f5e9; color: #2e7d32; padding: 6px; border-radius: 4px; margin-bottom: 8px;"><strong>✅ Weather Trigger:</strong> Conditions are currently stable. Standard scouting recommended.</li>`;
+        }
+
+        pestList.innerHTML = dynamicPestAlert + data.how_to_grow.pest_disease_management.map(p => `<li>${p}</li>`).join('');
 
         const actionList = document.getElementById('out-actions');
         actionList.innerHTML = data.action_checklist_today.map(a => `<li>${a}</li>`).join('');
@@ -231,7 +362,6 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
         `).join('');
 
-        // Render Smart Cultivation Zones
         const landDetailsEl = document.getElementById('out-land-details');
         landDetailsEl.innerHTML = data.cultivation_zones.map(z => `
             <div style="background: var(--bg-main); padding: 14px; border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border-color);">
@@ -247,7 +377,6 @@ document.addEventListener("DOMContentLoaded", () => {
             </div>
         `).join('');
 
-        // Pass the new zones array to the chart renderer
         renderLandChart(data.cultivation_zones);
     }
 
@@ -255,7 +384,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const ctx = document.getElementById('landDivisionChart').getContext('2d');
         if (landChartInstance) landChartInstance.destroy();
 
-        // Extract labels and percentages from the new schema
         const labels = zoneData.map(d => `${d.zone_name}\n${d.recommended_crop}`);
         const percentages = zoneData.map(d => d.percentage);
 
@@ -297,7 +425,6 @@ document.addEventListener("DOMContentLoaded", () => {
             matcherBtn.innerText = "Evaluating Suitability...";
             matcherBtn.disabled = true;
 
-            // Fix applied: concatenating land size and unit
             const sizeVal = document.getElementById('input-land-size').value.trim() || '5';
             const unitVal = document.getElementById('input-land-unit').value || 'Acres';
 
@@ -404,4 +531,99 @@ document.addEventListener("DOMContentLoaded", () => {
             body.style.display = isOpen ? 'none' : 'block';
         });
     });
+
+    // ==========================================
+    // 8. LIVE SOIL MOISTURE SENSOR (ESP32)
+    // ==========================================
+    const moistureDisplay = document.getElementById('moisture-display');
+    const irrigationDisplay = document.getElementById('irrigation-display');
+
+    function calculateIrrigationVolume(currentMoisture, context) {
+        if (!context.land_size || !context.crop) return null; 
+
+        let areaSqM = parseFloat(context.land_size);
+        const unit = context.land_unit.toLowerCase();
+        if (unit.includes('acre')) areaSqM *= 4046.86;
+        else if (unit.includes('hectare')) areaSqM *= 10000;
+        else if (unit.includes('cent')) areaSqM *= 40.47;
+        else if (unit.includes('gunta')) areaSqM *= 101.17;
+
+        let targetMoisture = 60; 
+        let cropFactor = 1.0; 
+        const crop = context.crop.toLowerCase();
+        if (crop.includes('rice') || crop.includes('paddy')) { targetMoisture = 85; cropFactor = 1.3; } 
+        else if (crop.includes('cotton') || crop.includes('maize')) { targetMoisture = 50; cropFactor = 0.8; } 
+        else if (crop.includes('tomato') || crop.includes('chilli')) { targetMoisture = 65; cropFactor = 1.1; }
+
+        let soilFactor = 1.0;
+        const soil = context.soil_type.toLowerCase();
+        if (soil.includes('sandy')) soilFactor = 0.7; 
+        else if (soil.includes('black') || soil.includes('clay')) soilFactor = 1.2; 
+
+        let tempText = document.getElementById('out-temp')?.innerText || "25";
+        let condText = document.getElementById('out-cond')?.innerText.toLowerCase() || "";
+        let currentTemp = parseFloat(tempText);
+        let weatherMultiplier = 1.0;
+
+        if (currentTemp > 35) weatherMultiplier = 1.25; 
+        else if (currentTemp < 20) weatherMultiplier = 0.85; 
+
+        if (condText.includes('rain') || condText.includes('shower') || condText.includes('storm')) {
+            weatherMultiplier = 0.0; 
+        }
+
+        if (currentMoisture >= targetMoisture || weatherMultiplier === 0.0) {
+            return { volume: 0, target: targetMoisture, reason: weatherMultiplier === 0.0 ? "Halted due to rain" : "Soil Wet", area: areaSqM };
+        }
+
+        const deficit = targetMoisture - currentMoisture;
+        const litersPerSqM = (deficit * 0.4) * cropFactor * soilFactor * weatherMultiplier;
+        const totalLiters = areaSqM * litersPerSqM;
+
+        return { volume: totalLiters, target: targetMoisture, reason: "Dispense", area: areaSqM };
+    }
+
+    if (moistureDisplay && irrigationDisplay) {
+        setInterval(async () => {
+            try {
+                const response = await fetch(`http://${ESP32_IP}/sensor`);
+                if (!response.ok) throw new Error("Sensor offline");
+                
+                const moisturePercent = parseFloat(await response.text()); 
+                moistureDisplay.innerText = moisturePercent.toFixed(1) + "%";
+
+                if (!activeFarmContext.crop || !activeFarmContext.land_size) {
+                    irrigationDisplay.innerText = "Awaiting Farm Plan Generation...";
+                    return;
+                }
+
+                const irrigationData = calculateIrrigationVolume(moisturePercent, activeFarmContext);
+                
+                if (irrigationData.volume === 0) {
+                    irrigationDisplay.innerHTML = `<span style="color:#d32f2f; font-weight:bold;">Standby: ${irrigationData.reason}</span>`;
+                } else {
+                    const formattedLiters = irrigationData.volume.toLocaleString('en-IN', { maximumFractionDigits: 1 });
+                    const rainDeduction = irrigationData.area.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+                    // structured layout for clarity
+                    irrigationDisplay.innerHTML = `
+                        <div style="margin-top: 5px; font-size: 0.95em; line-height: 1.6;">
+                            <span style="display:block; margin-bottom:6px;"><strong>Target:</strong> ${irrigationData.target}% | <strong>Volume required:</strong> ${formattedLiters} Liters</span>
+                            <span style="display:block; margin-bottom:6px; color:#1b4332; background:#e8f5e9; padding:6px; border-radius:4px;">
+                                <strong>⏱️ Schedule:</strong> Do not dispense at once. Split volume equally into two sessions (early morning & late evening) to prevent surface runoff and evaporation.
+                            </span>
+                            <span style="display:block; color:#e65100; background:#fff3e0; padding:6px; border-radius:4px;">
+                                <strong>🌧️ Rain Rule:</strong> If it rains, halt pump and subtract exactly <strong>${rainDeduction} Liters</strong> from today's requirement for every 1mm of rainfall.
+                            </span>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                console.error("Cannot reach ESP32", error);
+                moistureDisplay.innerText = "Offline";
+                irrigationDisplay.innerText = "Check ESP32 Power";
+            }
+        }, 3000);
+    }
 });
