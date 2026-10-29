@@ -37,7 +37,7 @@ function cleanMarkdown(text) {
 
 document.addEventListener("DOMContentLoaded", () => {
     
-    const ESP32_IP = "10.240.68.29"; 
+    const ESP32_IP = "192.168.54.29"; 
 
     // ==========================================
     // 1. CHIP SELECTION & FORM CONTROLS
