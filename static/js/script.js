@@ -90,11 +90,28 @@ document.addEventListener("DOMContentLoaded", () => {
             if (navigator.geolocation) {
                 geoStatus.innerText = "Querying device GPS...";
                 navigator.geolocation.getCurrentPosition(
-                    (pos) => {
+                    async (pos) => {
                         activeFarmContext.lat = pos.coords.latitude.toFixed(4);
                         activeFarmContext.lon = pos.coords.longitude.toFixed(4);
-                        document.getElementById('input-location').value = `GPS: ${activeFarmContext.lat}, ${activeFarmContext.lon}`;
-                        geoStatus.innerText = `GPS coordinates locked (${activeFarmContext.lat}, ${activeFarmContext.lon})`;
+                        
+                        document.getElementById('input-location').value = "Detecting area...";
+                        geoStatus.innerText = "Translating coordinates to city...";
+
+                        try {
+                            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${activeFarmContext.lat}&lon=${activeFarmContext.lon}`);
+                            const data = await response.json();
+                            
+                            const area = data.address.city || data.address.town || data.address.village || data.address.county || "Unknown Area";
+                            const state = data.address.state || "";
+                            
+                            document.getElementById('input-location').value = `${area}, ${state}`;
+                            geoStatus.innerText = `Location locked: ${area}`;
+                        } catch (error) {
+                            console.error("Reverse geocoding failed:", error);
+                            // Fallback to GPS coordinates if the map API fails
+                            document.getElementById('input-location').value = `GPS: ${activeFarmContext.lat}, ${activeFarmContext.lon}`;
+                            geoStatus.innerText = `GPS coordinates locked (${activeFarmContext.lat}, ${activeFarmContext.lon})`;
+                        }
                     },
                     (err) => {
                         geoStatus.innerText = "Location permission denied. Enter manually.";
